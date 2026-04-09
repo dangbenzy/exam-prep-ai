@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Prep AI</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; background: #f0f2f5; display: flex; justify-content: center; padding: 40px 20px; }
+        .container { background: white; padding: 30px; border-radius: 12px; width: 100%; max-width: 650px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #1a1a2e; margin-bottom: 8px; }
+        p.subtitle { text-align: center; color: #666; margin-bottom: 24px; font-size: 14px; }
+        .section { margin-bottom: 20px; }
+        label { display: block; font-weight: bold; margin-bottom: 6px; color: #333; font-size: 14px; }
+        input[type="file"] { width: 100%; padding: 10px; border: 2px dashed #ccc; border-radius: 8px; cursor: pointer; }
+        button { width: 100%; padding: 12px; background: #4f46e5; color: white; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; margin-top: 8px; }
+        button:hover { background: #4338ca; }
+        button:disabled { background: #aaa; cursor: not-allowed; }
+        .question-box { background: #f8f9ff; border-left: 4px solid #4f46e5; padding: 16px; border-radius: 8px; margin-bottom: 16px; font-size: 15px; color: #1a1a2e; }
+        textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; resize: vertical; min-height: 100px; }
+        .result { padding: 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; line-height: 1.6; }
+        .correct { background: #d1fae5; border-left: 4px solid #10b981; }
+        .incorrect { background: #fee2e2; border-left: 4px solid #ef4444; }
+        .hidden { display: none; }
+        .status { text-align: center; color: #666; font-size: 13px; margin-top: 8px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📚 Exam Prep AI</h1>
+    <p class="subtitle">Upload your study material and get quizzed instantly</p>
+
+    <!-- Upload Section -->
+    <div class="section" id="upload-section">
+        <label>Upload your PDF</label>
+        <input type="file" id="pdf-input" accept=".pdf" />
+        <button id="upload-btn" onclick="uploadPDF()">Upload & Start</button>
+        <p class="status" id="upload-status"></p>
+    </div>
+
+    <!-- Question Section -->
+    <div class="section hidden" id="question-section">
+        <label>Your Question</label>
+        <div class="question-box" id="question-text"></div>
+        <label>Your Answer</label>
+        <textarea id="answer-input" placeholder="Type your answer here..."></textarea>
+        <button id="submit-btn" onclick="submitAnswer()">Submit Answer</button>
+        <div class="result hidden" id="result-box"></div>
+        <button class="hidden" id="next-btn" onclick="getQuestion()">Next Question →</button>
+    </div>
+</div>
+
+<script>
+    const API = "http://127.0.0.1:8000";
+    let sessionId = null;
+    let currentQuestion = null;
+    let currentContext = null;
+
+    async function uploadPDF() {
+        const file = document.getElementById("pdf-input").files[0];
+        if (!file) return alert("Please select a PDF file");
+
+        const status = document.getElementById("upload-status");
+        const btn = document.getElementById("upload-btn");
+        btn.disabled = true;
+        status.textContent = "Uploading and processing...";
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+            const res = await fetch(`${API}/upload`, { method: "POST", body: formData });
+            const data = await res.json();
+            sessionId = data.session_id;
+            status.textContent = "✅ Upload successful!";
+            document.getElementById("upload-section").classList.add("hidden");
+            document.getElementById("question-section").classList.remove("hidden");
+            getQuestion();
+        } catch (err) {
+            status.textContent = "❌ Upload failed. Try again.";
+            btn.disabled = false;
+        }
+    }
+
+    async function getQuestion() {
+        const questionText = document.getElementById("question-text");
+        const resultBox = document.getElementById("result-box");
+        const nextBtn = document.getElementById("next-btn");
+        const answerInput = document.getElementById("answer-input");
+
+        questionText.textContent = "Generating question...";
+        resultBox.classList.add("hidden");
+        nextBtn.classList.add("hidden");
+        answerInput.value = "";
+
+        try {
+            const res = await fetch(`${API}/question/${sessionId}`);
+            const data = await res.json();
+            currentQuestion = data.question;
+            currentContext = data.context;
+            questionText.textContent = currentQuestion;
+        } catch (err) {
+            questionText.textContent = "Failed to load question. Try again.";
+        }
+    }
+
+    async function submitAnswer() {
+        const studentAnswer = document.getElementById("answer-input").value.trim();
+        if (!studentAnswer) return alert("Please type an answer first");
+
+        const resultBox = document.getElementById("result-box");
+        const nextBtn = document.getElementById("next-btn");
+        const btn = document.getElementById("submit-btn");
+        btn.disabled = true;
+        resultBox.classList.add("hidden");
+
+        try {
+            const res = await fetch(`${API}/answer`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    question: currentQuestion,
+                    context: currentContext,
+                    student_answer: studentAnswer
+                })
+            });
+            const data = await res.json();
+
+            resultBox.className = `result ${data.is_correct ? "correct" : "incorrect"}`;
+            resultBox.innerHTML = `
+                <strong>${data.is_correct ? "✅ Correct!" : "❌ Incorrect"}</strong><br>
+                ${data.feedback}
+                ${!data.is_correct && data.correct_answer !== "N/A" ? `<br><br><strong>Correct Answer:</strong> ${data.correct_answer}` : ""}
+            `;
+            resultBox.classList.remove("hidden");
+            nextBtn.classList.remove("hidden");
+        } catch (err) {
+            resultBox.className = "result incorrect";
+            resultBox.textContent = "Failed to evaluate answer. Try again.";
+            resultBox.classList.remove("hidden");
+        } finally {
+            btn.disabled = false;
+        }
+    }
+</script>
+</body>
+</html>
