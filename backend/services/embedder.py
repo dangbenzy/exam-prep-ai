@@ -1,20 +1,20 @@
 import chromadb
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 
 def get_embedding(text: str) -> list[float]:
-    result = genai.embed_content(
-        model="models/text-embedding-004",
-        content=text
+    client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+    result = client.models.embed_content(
+        model="text-embedding-004",
+        contents=text
     )
-    return result["embedding"]
+    return result.embeddings[0].values
 
 def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> list[str]:
     chunks = []
