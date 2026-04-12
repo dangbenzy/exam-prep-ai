@@ -6,10 +6,9 @@ COPY backend/requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
+RUN mkdir -p static
 COPY backend/ .
 COPY frontend/index.html ./static/index.html
-
-RUN mkdir -p static
 
 EXPOSE 8000
 

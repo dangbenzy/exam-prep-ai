@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from services.pdf_parser import extract_text_from_pdf
-from services.embedder import embed_and_store
+from services.embedder import store_session_chunks
 import uuid
 
 router = APIRouter()
@@ -21,7 +21,7 @@ async def upload_pdf(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Could not extract text from PDF")
     
     session_id = str(uuid.uuid4())
-    num_chunks = embed_and_store(session_id, text)
+    num_chunks = store_session_chunks(session_id, text)
     
     return {
         "session_id": session_id,

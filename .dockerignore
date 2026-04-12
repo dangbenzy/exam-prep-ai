@@ -1,0 +1,15 @@
+.git
+.github
+README.md
+docker-compose.yml
+
+backend/.env
+backend/venv/
+backend/__pycache__/
+backend/chroma_db/
+backend/*.pdf
+backend/*.db
+backend/*.sqlite3
+backend/static/
+
+frontend/node_modules/
