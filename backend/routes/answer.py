@@ -15,7 +15,13 @@ def submit_answer(request: AnswerRequest):
     if not request.student_answer.strip():
         raise HTTPException(status_code=400, detail="Answer cannot be empty")
 
-    result = evaluate_answer(request.context, request.question, request.student_answer)
+    try:
+        result = evaluate_answer(request.context, request.question, request.student_answer)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Answer evaluation failed. Please try again in a moment.",
+        ) from exc
 
     return {
         "session_id": request.session_id,

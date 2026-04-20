@@ -17,9 +17,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from routes import upload, question, answer
+from routes import answer, preferences, question, upload
 
 app.include_router(upload.router)
+app.include_router(preferences.router)
 app.include_router(question.router)
 app.include_router(answer.router)
 
