@@ -19,9 +19,12 @@ def _build_question_response(session_id: str):
         try:
             question = generate_question(
                 chunk=chunk["text"],
-                previous_questions=chunk.get("question_history", []),
+                previous_questions=chunk.get("recent_questions", chunk.get("question_history", [])),
                 section_heading=chunk.get("section_heading"),
             )
+        except ValueError:
+            attempted_chunk_ids.add(chunk["id"])
+            continue
         except Exception as exc:
             raise HTTPException(
                 status_code=502,
@@ -64,7 +67,10 @@ def _build_question_response(session_id: str):
             "progress": progress,
         }
 
-    raise HTTPException(status_code=409, detail="Could not generate a new distinct question for this quiz scope")
+    raise HTTPException(
+        status_code=503,
+        detail="Could not generate a complete, distinct question right now. Please try again.",
+    )
 
 
 @router.get("/question/{session_id}")

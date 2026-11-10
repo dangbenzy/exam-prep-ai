@@ -348,6 +348,7 @@ def store_session_document(
             "total_pages": total_pages,
             "last_chunk_id": None,
             "used_questions": set(),
+            "question_history": [],
         }
 
     return 0
@@ -414,6 +415,7 @@ def set_session_preferences(
         session["updated_at"] = _now()
         session["last_chunk_id"] = None
         session["used_questions"].clear()
+        session["question_history"].clear()
 
         return {
             "scope": scope,
@@ -452,10 +454,12 @@ def get_next_chunk(session_id: str, exclude_chunk_ids: set[str] | None = None) -
         selected = min(least_used, key=lambda chunk: chunk["source_order"])
         session["updated_at"] = _now()
 
-        return {
+        selected_chunk = {
             key: (value.copy() if isinstance(value, list) else value)
             for key, value in selected.items()
         }
+        selected_chunk["recent_questions"] = session["question_history"][-5:].copy()
+        return selected_chunk
 
 
 def _normalize_question(question: str) -> str:
@@ -511,6 +515,7 @@ def record_chunk_question(session_id: str, chunk_id: str, question: str) -> bool
             chunk["question_count"] += 1
             chunk["question_history"].append(question)
             session["used_questions"].add(normalized_question)
+            session["question_history"].append(question)
             session["last_chunk_id"] = chunk_id
             session["updated_at"] = _now()
             return True

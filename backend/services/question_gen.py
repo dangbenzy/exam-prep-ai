@@ -19,7 +19,7 @@ def generate_question(
     if previous_questions:
         formatted_history = "\n".join(f"- {question}" for question in previous_questions[-3:])
         history_block = f"""
-Do not repeat or closely paraphrase any of these earlier questions from the same source chunk:
+Do not repeat or closely paraphrase any of these earlier questions from this quiz:
 {formatted_history}
 """
 
@@ -27,9 +27,9 @@ Do not repeat or closely paraphrase any of these earlier questions from the same
 
     prompt = f"""You are an exam question generator.
 
-Given the following text, generate ONE clear, distinct exam-style question that tests understanding of the content.
-Use only the supplied text. Focus on one examinable idea. Return ONLY the question.
-Avoid generic wording and avoid repeating earlier questions.
+Given the following text, generate ONE complete, clear, distinct exam-style question that tests understanding of the content.
+Use only the supplied text and focus on one examinable idea. Return only the question on one line, ending with a question mark.
+Do not return a fragment, an answer, an explanation, or repeat/closely paraphrase an earlier question.
 {history_block}
 {heading_block}
 Text:
@@ -37,11 +37,24 @@ Text:
 
 Question:"""
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.6,
-        max_tokens=120,
-    )
+    generation_options = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.4,
+        "max_completion_tokens": 256,
+    }
+    if model.startswith("openai/gpt-oss-"):
+        generation_options.update(reasoning_effort="low", include_reasoning=False)
 
-    return response.choices[0].message.content.strip()
+    response = client.chat.completions.create(**generation_options)
+    choice = response.choices[0]
+    question = (choice.message.content or "").strip().replace("\n", " ")
+    question = " ".join(question.split()).strip(" `\"'“”‘’")
+
+    if choice.finish_reason == "length":
+        raise ValueError("The model truncated the question before completing it")
+
+    if len(question.split()) < 3 or not question.endswith("?"):
+        raise ValueError("The model did not return a complete question")
+
+    return question

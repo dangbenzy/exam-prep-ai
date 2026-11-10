@@ -502,6 +502,9 @@
         const answerInput = document.getElementById("answer-input");
 
         quizCompleted = false;
+        currentQuestion = null;
+        currentContext = null;
+        document.getElementById("next-btn").textContent = "Next Question";
         questionText.textContent = "Generating question...";
         resultBox.classList.add("hidden");
         answerInput.value = "";
@@ -528,7 +531,8 @@
             setQuestionInteractionState({ canSubmit: true, canSkip: true, showNext: false });
         } catch (err) {
             questionText.textContent = err.message || "Failed to load question. Try again.";
-            setQuestionInteractionState({ canSubmit: false, canSkip: false, showNext: false });
+            document.getElementById("next-btn").textContent = "Try Again";
+            setQuestionInteractionState({ canSubmit: false, canSkip: false, showNext: true });
         }
     }
 
