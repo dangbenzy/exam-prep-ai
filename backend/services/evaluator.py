@@ -1,4 +1,7 @@
+import json
 import os
+import re
+
 from groq import Groq
 from dotenv import load_dotenv
 
@@ -19,30 +22,73 @@ Question:
 Student's Answer:
 {student_answer}
 
-Evaluate if the student's answer is correct based on the context.
-Respond in exactly this format:
-RESULT: CORRECT or INCORRECT
-FEEDBACK: If correct, start with "You were right!" and explain why the answer is correct. If incorrect, start with "Your answer was wrong." and explain why.
-CORRECT ANSWER: the correct answer if wrong, or "N/A" if correct
+Evaluate whether the student's answer is correct based only on the context.
+Return a JSON object with exactly these keys:
+- "correct_answer": "N/A" when correct; otherwise give a concise, complete answer that directly answers the question using the context
+- "feedback": one concise explanation that starts with "You were right!" when correct or "Your answer was wrong." when incorrect
+- "is_correct": a boolean
+Never leave "correct_answer" empty when the answer is incorrect.
 """
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3,
-        max_tokens=200
-    )
+    generation_options = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.2,
+        "max_completion_tokens": 768,
+        "response_format": {"type": "json_object"},
+    }
+    if model.startswith("openai/gpt-oss-"):
+        generation_options.update(
+            reasoning_effort="low",
+            include_reasoning=False,
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "answer_evaluation",
+                    "strict": True,
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "correct_answer": {"type": "string"},
+                            "feedback": {"type": "string"},
+                            "is_correct": {"type": "boolean"},
+                        },
+                        "required": ["correct_answer", "feedback", "is_correct"],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+        )
 
-    raw = response.choices[0].message.content.strip()
+    response = client.chat.completions.create(**generation_options)
+    raw = (response.choices[0].message.content or "").strip()
 
-    result = {"is_correct": False, "feedback": "", "correct_answer": ""}
+    try:
+        parsed = json.loads(raw)
+        is_correct = parsed.get("is_correct", False)
+        if isinstance(is_correct, str):
+            is_correct = is_correct.strip().lower() in {"true", "correct", "yes"}
 
-    for line in raw.split("\n"):
-        if line.startswith("RESULT:"):
-            result["is_correct"] = "CORRECT" in line.upper() and "INCORRECT" not in line.upper()
-        elif line.startswith("FEEDBACK:"):
-            result["feedback"] = line.replace("FEEDBACK:", "").strip()
-        elif line.startswith("CORRECT ANSWER:"):
-            result["correct_answer"] = line.replace("CORRECT ANSWER:", "").strip()
+        feedback = str(parsed.get("feedback") or "").strip()
+        correct_answer = str(parsed.get("correct_answer") or "").strip()
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        # Keep older/custom model outputs usable if they ignore JSON mode.
+        result_match = re.search(r"^\s*(?:RESULT:\s*)?(CORRECT|INCORRECT)\b", raw, re.IGNORECASE | re.MULTILINE)
+        is_correct = bool(result_match and result_match.group(1).upper() == "CORRECT")
+        feedback_match = re.search(
+            r"^\s*FEEDBACK:\s*(.*?)(?=^\s*CORRECT ANSWER:|\Z)",
+            raw,
+            re.IGNORECASE | re.MULTILINE | re.DOTALL,
+        )
+        answer_match = re.search(r"^\s*CORRECT ANSWER:\s*(.*)\Z", raw, re.IGNORECASE | re.MULTILINE | re.DOTALL)
+        feedback = feedback_match.group(1).strip() if feedback_match else ""
+        correct_answer = answer_match.group(1).strip() if answer_match else ""
 
-    return result
+    if not is_correct and (not correct_answer or correct_answer.upper() == "N/A"):
+        correct_answer = feedback or "Please review the supplied source context for the correct answer."
+
+    return {
+        "is_correct": bool(is_correct),
+        "feedback": feedback,
+        "correct_answer": "N/A" if is_correct else correct_answer,
+    }

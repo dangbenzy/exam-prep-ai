@@ -585,7 +585,7 @@
             resultBox.innerHTML = `
                 <strong>${data.is_correct ? "Correct" : "Incorrect"}</strong><br>
                 ${data.feedback}
-                ${!data.is_correct && data.correct_answer !== "N/A" ? `<br><br><strong>Suggested answer:</strong> ${data.correct_answer}` : ""}
+                ${!data.is_correct ? `<br><br><strong>Suggested answer:</strong> ${data.correct_answer || data.feedback || "Please review the supplied source context for the correct answer."}` : ""}
             `;
             resultBox.classList.remove("hidden");
             setQuestionInteractionState({ canSubmit: false, canSkip: false, showNext: true });
