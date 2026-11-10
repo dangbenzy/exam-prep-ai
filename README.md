@@ -86,7 +86,10 @@ Create `backend/.env` and add:
 
 ```env
 GROQ_API_KEY=your_groq_api_key
+GROQ_MODEL=openai/gpt-oss-120b
 ```
+
+`GROQ_MODEL` is optional. If omitted, the app uses `openai/gpt-oss-120b`, a current Groq model available on the free tier. Set it to another model ID enabled for your Groq account to change models.
 
 Optional memory/session tuning:
 

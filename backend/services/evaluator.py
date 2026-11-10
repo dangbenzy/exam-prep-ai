@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
 def evaluate_answer(chunk: str, question: str, student_answer: str) -> dict:
     prompt = f"""You are an exam evaluator.
@@ -26,7 +27,7 @@ CORRECT ANSWER: the correct answer if wrong, or "N/A" if correct
 """
 
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model=model,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
         max_tokens=200
